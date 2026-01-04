@@ -117,6 +117,8 @@ def save_seen_ids(seen_ids: set[str]) -> None:
 
 
 def main():
+    send_telegram("✅ GitHub Action ran successfully (test ping)")
+
     seen_ids = load_seen_ids()
 
     while True:
