@@ -2,16 +2,17 @@ import time
 import json
 import requests
 import os
-
 from pathlib import Path
 
+TEST_MODE = os.getenv("TEST_MODE") == "1"
+
 RAW_URL = "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/README.md"
-
-
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
+if not BOT_TOKEN or not CHAT_ID:
+    raise RuntimeError("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID")
 
 CHECK_EVERY_SECONDS = 900  # 15 minutes
 STATE_FILE = Path("seen_swe_internships.json")
@@ -19,7 +20,6 @@ STATE_FILE = Path("seen_swe_internships.json")
 
 def send_telegram(message: str) -> None:
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-
     params = {"chat_id": CHAT_ID, "text": message}
     r = requests.get(url, params=params, timeout=20)
     r.raise_for_status()
@@ -55,7 +55,6 @@ def is_swe_role(role: str) -> bool:
 
 
 def extract_listing_rows(readme_text: str) -> list[str]:
-    
     rows = []
     for line in readme_text.splitlines():
         line = line.strip()
@@ -75,19 +74,21 @@ def extract_listing_rows(readme_text: str) -> list[str]:
             continue
 
         rows.append(line)
-    rows.append("| Microsoft | Software Engineer Intern https://www.microsoft.com |")
+
+    # Properly formatted test row (Company | Role | Location | Link)
+    if TEST_MODE:
+        rows.append("| Microsoft | Software Engineer Intern | Remote | https://www.microsoft.com |")
+
     return rows
 
 
 def row_to_columns(row: str) -> list[str]:
-    # Split by |, remove empty ends, trim whitespace
     return [p.strip() for p in row.strip("|").split("|")]
 
 
 def format_row_message(row: str) -> str:
     parts = row_to_columns(row)
 
-    # Most tables are: Company | Role | Location | Link | ...
     company = parts[0] if len(parts) > 0 else "Unknown"
     role = parts[1] if len(parts) > 1 else "Unknown"
     location = parts[2] if len(parts) > 2 else "Unknown"
@@ -116,8 +117,10 @@ def save_seen_ids(seen_ids: set[str]) -> None:
 
 
 def main():
-    send_telegram("A cloud-run bot that monitors GitHub internship listings, filters for new software engineering roles, and sends real-time notifications when opportunities are added.\nBuilt by: Harry Ducu");
-
+    send_telegram(
+        "A cloud-run bot that monitors GitHub internship listings, filters for new software engineering roles, "
+        "and sends real-time notifications when opportunities are added.\nBuilt by: Harry Ducu"
+    )
 
     seen_ids = load_seen_ids()
 
@@ -136,7 +139,6 @@ def main():
                 if is_swe_role(role):
                     swe_rows.append(row)
 
-            # Normalize row whitespace to create stable IDs
             current_ids = set(" ".join(r.split()) for r in swe_rows)
 
             if not seen_ids:
@@ -144,6 +146,13 @@ def main():
                 save_seen_ids(current_ids)
                 seen_ids = current_ids
                 print("Baseline saved (SWE only). Watching for NEW SWE internships...")
+
+                # Force a test alert on baseline when TEST_MODE is enabled
+                if TEST_MODE:
+                    test_row = "| Microsoft | Software Engineer Intern | Remote | https://www.microsoft.com |"
+                    send_telegram("🧪 TEST_MODE is ON — sending a sample internship alert.")
+                    send_telegram(format_row_message(test_row))
+
             else:
                 new_ids = current_ids - seen_ids
 
@@ -151,7 +160,6 @@ def main():
                     print(f"Found {len(new_ids)} new SWE internship(s). Sending alerts...")
                     send_telegram(f"🚨 {len(new_ids)} new SWE internship listing(s) added!")
 
-                    # Send details (cap to avoid spam)
                     max_to_send = 5
                     for i, row_id in enumerate(sorted(new_ids)):
                         if i >= max_to_send:
@@ -159,7 +167,6 @@ def main():
                             break
                         send_telegram(format_row_message(row_id))
 
-                    # Update state
                     seen_ids = current_ids
                     save_seen_ids(seen_ids)
                 else:
