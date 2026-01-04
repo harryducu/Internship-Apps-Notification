@@ -18,7 +18,7 @@ STATE_FILE = Path("seen_swe_internships.json")
 
 
 def send_telegram(message: str) -> None:
-    url = furl = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
     params = {"chat_id": CHAT_ID, "text": message}
     r = requests.get(url, params=params, timeout=20)
@@ -116,7 +116,8 @@ def save_seen_ids(seen_ids: set[str]) -> None:
 
 
 def main():
-    
+    send_telegram("A cloud-run bot that monitors GitHub internship listings, filters for new software engineering roles, and sends real-time notifications when opportunities are added.\nBuilt by: Harry Ducu");
+
 
     seen_ids = load_seen_ids()
 
