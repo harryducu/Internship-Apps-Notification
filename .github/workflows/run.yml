@@ -2,13 +2,12 @@ name: SWE Internship Notifier
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # every 15 minutes
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 jobs:
   run:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -20,21 +19,17 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
       - name: Restore state cache
         uses: actions/cache@v4
         with:
           path: seen_swe_internships.json
-          key: swe-state
+          key: swe-state-${{ github.run_id }}
+          restore-keys: |
+            swe-state-
 
       - name: Run notifier
         run: python notifier.py
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      
-      - name: Save state cache
-        uses: actions/cache@v4
-        with:
-          path: seen_swe_internships.json
-          key: swe-state
-
