@@ -75,7 +75,7 @@ def extract_listing_rows(readme_text: str) -> list[str]:
             continue
 
         rows.append(line)
-
+    rows.append("| Microsoft | Software Engineer Intern https://www.microsoft.com |")
     return rows
 
 
