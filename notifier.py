@@ -75,10 +75,7 @@ def extract_listing_rows(readme_text: str) -> list[str]:
 
         rows.append(line)
 
-    # Properly formatted test row (Company | Role | Location | Link)
-    if TEST_MODE:
-        rows.append("| Microsoft | Software Engineer Intern | Remote | https://www.microsoft.com |")
-
+    
     return rows
 
 
