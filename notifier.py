@@ -75,7 +75,7 @@ def extract_listing_rows(readme_text: str) -> list[str]:
             continue
 
         rows.append(line)
-    rows.append("| TestCorp | Software Engineer Intern | Remote | https://example.com |")
+    rows.append("| testing | Software Engineer Intern | Remote | https://example.com |")
 
     return rows
 
@@ -117,7 +117,7 @@ def save_seen_ids(seen_ids: set[str]) -> None:
 
 
 def main():
-    send_telegram("✅ GitHub Action ran successfully (test ping)")
+    
 
     seen_ids = load_seen_ids()
 
