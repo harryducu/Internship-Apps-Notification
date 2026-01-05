@@ -3,7 +3,7 @@ import requests
 import os
 from pathlib import Path
 
-TEST_MODE = os.getenv("TEST_MODE") == "1"
+
 
 RAW_URL = "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/README.md"
 
