@@ -1,4 +1,3 @@
-import time
 import json
 import requests
 import os
@@ -14,7 +13,6 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 if not BOT_TOKEN or not CHAT_ID:
     raise RuntimeError("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID")
 
-CHECK_EVERY_SECONDS = 900  # 15 minutes
 STATE_FILE = Path("seen_swe_internships.json")
 
 
@@ -59,22 +57,18 @@ def extract_listing_rows(readme_text: str) -> list[str]:
     for line in readme_text.splitlines():
         line = line.strip()
 
-        # Must look like a markdown table row
         if not (line.startswith("|") and line.endswith("|")):
             continue
 
-        # Skip separator rows like: | --- | --- |
         stripped = line.replace("|", "").replace("-", "").replace(" ", "")
         if stripped == "":
             continue
 
-        # Skip header rows (usually contain Company/Role)
         lower = line.lower()
         if "company" in lower and "role" in lower:
             continue
 
         rows.append(line)
-
 
     return rows
 
@@ -114,65 +108,33 @@ def save_seen_ids(seen_ids: set[str]) -> None:
 
 
 def main():
-    send_telegram(
-        "A cloud-run bot that monitors GitHub internship listings, filters for new software engineering roles, "
-        "and sends real-time notifications when opportunities are added.\nBuilt by: Harry Ducu"
-    )
-
     seen_ids = load_seen_ids()
 
-    while True:
-        try:
-            readme = fetch_readme_text()
-            rows = extract_listing_rows(readme)
+    readme = fetch_readme_text()
+    rows = extract_listing_rows(readme)
 
-            # Filter rows down to SWE-ish roles
-            swe_rows = []
-            for row in rows:
-                cols = row_to_columns(row)
-                if len(cols) < 2:
-                    continue
-                role = cols[1]
-                if is_swe_role(role):
-                    swe_rows.append(row)
+    swe_rows = []
+    for row in rows:
+        cols = row_to_columns(row)
+        if len(cols) < 2:
+            continue
+        if is_swe_role(cols[1]):
+            swe_rows.append(row)
 
-            current_ids = set(" ".join(r.split()) for r in swe_rows)
+    current_ids = set(" ".join(r.split()) for r in swe_rows)
 
-            if not seen_ids:
-                # Baseline: don't alert on first run
-                save_seen_ids(current_ids)
-                seen_ids = current_ids
-                print("Baseline saved (SWE only). Watching for NEW SWE internships...")
+    if not seen_ids:
+        save_seen_ids(current_ids)
+        print("Baseline saved.")
+        return
 
-                # Force a test alert on baseline when TEST_MODE is enabled
-                if TEST_MODE:
-                    test_row = "| Microsoft | Software Engineer Intern | Remote | https://www.microsoft.com |"
-                    send_telegram("🧪 TEST_MODE is ON — sending a sample internship alert.")
-                    send_telegram(format_row_message(test_row))
+    new_ids = current_ids - seen_ids
 
-            else:
-                new_ids = current_ids - seen_ids
-
-                if new_ids:
-                    print(f"Found {len(new_ids)} new SWE internship(s). Sending alerts...")
-                    send_telegram(f"🚨 {len(new_ids)} new SWE internship listing(s) added!")
-
-                    max_to_send = 5
-                    for i, row_id in enumerate(sorted(new_ids)):
-                        if i >= max_to_send:
-                            send_telegram(f"(Showing first {max_to_send}. Check README for more.)")
-                            break
-                        send_telegram(format_row_message(row_id))
-
-                    seen_ids = current_ids
-                    save_seen_ids(seen_ids)
-                else:
-                    print("No new SWE internships.")
-
-        except Exception as e:
-            print("Error:", e)
-
-        time.sleep(CHECK_EVERY_SECONDS)
+    if new_ids:
+        send_telegram(f"🚨 {len(new_ids)} new SWE internship listing(s) added!")
+        for row in sorted(new_ids)[:5]:Â
+            send_telegram(format_row_message(row))
+        save_seen_ids(current_ids)
 
 
 if __name__ == "__main__":
