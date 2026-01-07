@@ -132,8 +132,9 @@ def main():
 
     if new_ids:
         send_telegram(f"🚨 {len(new_ids)} new SWE internship listing(s) added!")
-        for row in sorted(new_ids)[:5]:Â
+        for row in sorted(new_ids)[:5]:
             send_telegram(format_row_message(row))
+
         save_seen_ids(current_ids)
 
 
