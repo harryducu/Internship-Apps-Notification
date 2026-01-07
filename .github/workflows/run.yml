@@ -28,9 +28,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: seen_swe_internships.json
-          key: swe-state-${{ github.ref_name }}-${{ github.run_id }}
+          key: swe-state-v2-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
-            swe-state-${{ github.ref_name }}-
+            swe-state-v2-${{ github.ref_name }}-
       - name: Show restored state contents
         run: |
           echo "---- seen_swe_internships.json (restored) ----"
@@ -56,4 +56,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: seen_swe_internships.json
-          key: swe-state-${{ github.ref_name }}-${{ github.run_id }}
+          key: swe-state-v2-${{ github.ref_name }}-${{ github.run_id }}
