@@ -144,7 +144,6 @@ def main() -> None:
     current_ids = set(str(role.get("id")) for role in swe_listings if role.get("id"))
     
     print("Current SWE ids:", len(current_ids))
-    current_ids.add("TEST_FAKE_ID_123")
 
 
     # First run: baseline only
