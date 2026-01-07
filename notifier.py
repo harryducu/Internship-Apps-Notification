@@ -130,6 +130,8 @@ def main():
         return
 
     new_ids = current_ids - seen_ids
+    new_ids.add("| Test Company | Software Engineer Intern | Remote | https://example.com |")
+
 
     if new_ids:
         send_telegram(f"🚨 {len(new_ids)} new SWE internship listing(s) added!")
