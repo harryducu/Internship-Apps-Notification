@@ -98,9 +98,14 @@ def format_row_message(row: str) -> str:
 
 def load_seen_ids() -> set[str]:
     if STATE_FILE.exists():
-        data = json.loads(STATE_FILE.read_text())
-        return set(data.get("seen_ids", []))
+        try:
+            data = json.loads(STATE_FILE.read_text())
+            ids = data.get("seen_ids", [])
+            return set(ids) if ids else set()
+        except Exception:
+            return set()
     return set()
+
 
 
 def save_seen_ids(seen_ids: set[str]) -> None:
@@ -123,6 +128,8 @@ def main():
             swe_rows.append(row)
 
     current_ids = set(" ".join(r.split()) for r in swe_rows)
+    print("Current SWE ids:", len(current_ids))
+
 
     if not seen_ids:
         send_telegram("✅ Test: Telegram is working. Baseline will now be saved.")
