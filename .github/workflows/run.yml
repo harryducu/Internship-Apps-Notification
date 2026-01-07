@@ -12,48 +12,26 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      # 🔄 Restore previous state (if any)
       - name: Restore state
-        id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache@v4
         with:
           path: seen_swe_internships.json
-          key: swe-state-v2-${{ github.ref_name }}-${{ github.run_id }}
-          restore-keys: |
-            swe-state-v2-${{ github.ref_name }}-
-      - name: Show restored state contents
-        run: |
-          echo "---- seen_swe_internships.json (restored) ----"
-          cat seen_swe_internships.json || true
+          key: swe-state-v2-${{ github.ref_name }}
 
-
-      # 🐍 Install deps
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ▶️ Run notifier
       - name: Run notifier
         run: python notifier.py
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-
-      # 💾 Save state (always with unique key)
-      - name: Save state
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: seen_swe_internships.json
-          key: swe-state-v2-${{ github.ref_name }}-${{ github.run_id }}
