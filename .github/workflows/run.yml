@@ -1,9 +1,13 @@
 name: SWE Internship Notifier
 
-#on:
-  #schedule:
-   # - cron: "*/15 * * * *"   
+on:
+  schedule:
+    - cron: "*/15 * * * *"
   workflow_dispatch:
+
+concurrency:
+  group: swe-notifier-${{ github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   run:
@@ -18,19 +22,4 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Restore state cache
-        uses: actions/cache@v4
-        with:
-          path: seen_swe_internships.json
-          key: swe-state-${{ github.ref_name }}-${{ github.run_id }}
-          restore-keys: |
-            swe-state-${{ github.ref_name }}-
-
-
-      - name: Run notifier
-        run: python notifier.py
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: pip install
