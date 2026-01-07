@@ -30,6 +30,13 @@ jobs:
           ls -la
           echo "REQUIREMENTS CONTENTS:"
           cat requirements.txt || echo "requirements.txt not found"
+      - name: Restore state cache
+        uses: actions/cache@v4
+        with:
+          path: seen_swe_internships.json
+          key: swe-state-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            swe-state-${{ github.ref_name }}-
 
       - name: Install dependencies
         run: |
