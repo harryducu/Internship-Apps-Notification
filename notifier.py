@@ -1,12 +1,14 @@
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import requests
 
-# This repo's README is NOT a pipe table anymore.
-# We parse the "## Software Engineering Internship Roles" section.
-RAW_URL = "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/README.md"
+# Stable data source (JSON), not the README formatting.
+LISTINGS_URL = (
+    "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/.github/scripts/listings.json"
+)
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -19,62 +21,51 @@ STATE_FILE = Path("seen_swe_internships.json")
 
 def send_telegram(message: str) -> None:
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    params = {"chat_id": CHAT_ID, "text": message, "disable_web_page_preview": True}
+    params = {
+        "chat_id": CHAT_ID,
+        "text": message,
+        "disable_web_page_preview": True,
+    }
     r = requests.get(url, params=params, timeout=20)
     r.raise_for_status()
 
 
-def fetch_readme_text() -> str:
-    r = requests.get(RAW_URL, headers={"User-Agent": "internship-notifier/1.0"}, timeout=20)
+def fetch_listings() -> list[dict[str, Any]]:
+    r = requests.get(LISTINGS_URL, headers={"User-Agent": "internship-notifier/1.0"}, timeout=30)
     r.raise_for_status()
-    return r.text
+    data = r.json()
+    if not isinstance(data, list):
+        raise RuntimeError("Unexpected listings.json format (expected a list)")
+    return data
 
 
-def extract_swe_section_lines(readme_text: str) -> list[str]:
-    """
-    Extract listing lines from:
-      ## Software Engineering Internship Roles
-    until the next ## header.
+def is_swe_role(title: str) -> bool:
+    t = (title or "").lower()
 
-    The lines in this section are markdown-ish, often like:
-      [Company](link) | Role | Location | ...
-    or sometimes continuation lines starting with "↳".
-    """
-    lines = readme_text.splitlines()
+    include = [
+        "software", "software engineer", "swe",
+        "backend", "back end", "frontend", "front end",
+        "full stack", "full-stack",
+        "mobile", "ios", "android",
+        "security", "cyber",
+        "developer", "engineer",
+    ]
 
-    start = None
-    for i, line in enumerate(lines):
-        if line.strip().startswith("## Software Engineering Internship Roles"):
-            start = i + 1
-            break
+    exclude = [
+        "data analyst", "data analytics", "business", "product",
+        "program manager", "pm",
+        "designer", "design", "ux", "ui",
+        "marketing", "sales", "finance", "accounting", "hr",
+        "qa", "test engineer", "quality assurance",
+        "sre", "site reliability", "devops",
+    ]
 
-    if start is None:
-        return []
+    # If it clearly matches excluded categories, drop it.
+    if any(k in t for k in exclude):
+        return False
 
-    end = len(lines)
-    for j in range(start, len(lines)):
-        s = lines[j].strip()
-        if s.startswith("## "):
-            end = j
-            break
-
-    section = lines[start:end]
-
-    rows: list[str] = []
-    for line in section:
-        s = line.strip()
-        if not s:
-            continue
-
-        # Skip the section header row if present
-        if s.lower().startswith("company role location"):
-            continue
-
-        # Most real listings start with a markdown link or a continuation arrow
-        if s.startswith("[") or s.startswith("↳"):
-            rows.append(s)
-
-    return rows
+    # Otherwise require at least one include keyword.
+    return any(k in t for k in include)
 
 
 def load_seen_ids() -> set[str]:
@@ -92,26 +83,59 @@ def save_seen_ids(seen_ids: set[str]) -> None:
     STATE_FILE.write_text(json.dumps({"seen_ids": sorted(seen_ids)}, indent=2))
 
 
-def format_row_message(line: str) -> str:
-    # Keep it simple: send the raw line (it usually includes company + role + location)
-    # Telegram will show it nicely; disable_web_page_preview is enabled.
-    return f"🚨 New SWE Internship\n{line}"
+def fmt_role(role: dict[str, Any]) -> str:
+    company = role.get("company_name", "Unknown")
+    title = role.get("title", "Unknown")
+    url = role.get("url", "")
+    locations = role.get("locations") or []
+    terms = role.get("terms") or []
+    sponsorship = role.get("sponsorship", "Unknown")
+
+    loc_str = ", ".join(locations) if locations else "Unknown"
+    term_str = ", ".join(terms) if terms else "Unknown"
+
+    msg = (
+        "🚨 New SWE Internship\n"
+        f"Company: {company}\n"
+        f"Role: {title}\n"
+        f"Location: {loc_str}\n"
+        f"Term: {term_str}\n"
+        f"Sponsorship: {sponsorship}\n"
+    )
+    if url:
+        msg += f"Link: {url}"
+    return msg
 
 
 def main() -> None:
     seen_ids = load_seen_ids()
     print("Loaded seen_ids:", len(seen_ids))
 
-    readme = fetch_readme_text()
-    swe_lines = extract_swe_section_lines(readme)
+    listings = fetch_listings()
+    print("Fetched listings:", len(listings))
 
-    # Normalize whitespace so minor spacing changes don't cause false positives
-    current_ids = set(" ".join(line.split()) for line in swe_lines)
+    swe_listings: list[dict[str, Any]] = []
+    for role in listings:
+        if not isinstance(role, dict):
+            continue
 
-    print("SWE section lines:", len(swe_lines))
+        if not role.get("active", False):
+            continue
+        if not role.get("is_visible", False):
+            continue
+
+        title = str(role.get("title", ""))
+        if not is_swe_role(title):
+            continue
+
+        swe_listings.append(role)
+
+    print("Filtered SWE listings:", len(swe_listings))
+
+    current_ids = set(str(role.get("id")) for role in swe_listings if role.get("id"))
     print("Current SWE ids:", len(current_ids))
 
-    # First run: save baseline only
+    # First run: baseline only
     if not seen_ids:
         save_seen_ids(current_ids)
         print("Baseline saved.")
@@ -121,12 +145,17 @@ def main() -> None:
 
     if new_ids:
         send_telegram(f"🚨 {len(new_ids)} new SWE internship listing(s) added!")
-        for line in list(sorted(new_ids))[:5]:
-            send_telegram(format_row_message(line))
+        # Send up to 5 listings (sorted for stable order)
+        id_to_role = {str(r.get("id")): r for r in swe_listings if r.get("id")}
+        for rid in sorted(new_ids)[:5]:
+            role = id_to_role.get(rid)
+            if role:
+                send_telegram(fmt_role(role))
+            else:
+                send_telegram(f"🚨 New SWE Internship (id: {rid})")
     else:
         print("No new listings.")
 
-    # Always update state to latest
     save_seen_ids(current_ids)
 
 
