@@ -12,7 +12,6 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -22,21 +21,26 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Debug requirements file
-        run: |
-          echo "PWD:"
-          pwd
-          echo "FILES:"
-          ls -la
-          echo "REQUIREMENTS CONTENTS:"
-          cat requirements.txt || echo "requirements.txt not found"
-      - name: Restore state cache
-        uses: actions/cache@v4
+      # ✅ RESTORE cache (restore-only)
+      - name: Restore state
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: seen_swe_internships.json
-          key: swe-state-${{ github.ref_name }}-${{ github.run_id }}
+          key: swe-state-${{ github.ref_name }}
           restore-keys: |
-            swe-state-${{ github.ref_name }}-
+            swe-state-
+
+      - name: Show restored state (debug)
+        run: |
+          echo "Cache hit? ${{ steps.cache-restore.outputs.cache-hit }}"
+          ls -la
+          if [ -f seen_swe_internships.json ]; then
+            echo "State file exists (restored)."
+            wc -c seen_swe_internships.json
+          else
+            echo "No state file restored."
+          fi
 
       - name: Install dependencies
         run: |
@@ -44,7 +48,24 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run notifier
+        run: python notifier.py
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python notifier.py
+
+      - name: Show state after run (debug)
+        run: |
+          ls -la
+          if [ -f seen_swe_internships.json ]; then
+            echo "State file exists (after run)."
+            wc -c seen_swe_internships.json
+          else
+            echo "State file NOT created!"
+          fi
+
+      # ✅ SAVE cache (save-only)
+      - name: Save state
+        uses: actions/cache/save@v4
+        with:
+          path: seen_swe_internships.json
+          key: swe-state-${{ github.ref_name }}
