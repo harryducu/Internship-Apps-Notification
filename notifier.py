@@ -109,6 +109,7 @@ def save_seen_ids(seen_ids: set[str]) -> None:
 
 def main():
     seen_ids = load_seen_ids()
+    print("Loaded seen_ids:", len(seen_ids)) 
 
     readme = fetch_readme_text()
     rows = extract_listing_rows(readme)
