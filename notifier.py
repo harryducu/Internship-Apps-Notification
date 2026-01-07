@@ -5,7 +5,6 @@ from typing import Any
 
 import requests
 
-# Stable data source (JSON), not the README formatting.
 LISTINGS_URL = (
     "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/.github/scripts/listings.json"
 )
@@ -17,6 +16,14 @@ if not BOT_TOKEN or not CHAT_ID:
     raise RuntimeError("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID")
 
 STATE_FILE = Path("seen_swe_internships.json")
+
+RUN_MESSAGE = (
+    "🤖 SWE Internship Notifier is running\n\n"
+    "A cloud-run bot that monitors GitHub internship listings, "
+    "filters for new software engineering roles, and sends real-time notifications "
+    "when opportunities are added.\n\n"
+    "Built by: Harry Ducu"
+)
 
 
 def send_telegram(message: str) -> None:
@@ -110,6 +117,8 @@ def fmt_role(role: dict[str, Any]) -> str:
 def main() -> None:
     seen_ids = load_seen_ids()
     print("Loaded seen_ids:", len(seen_ids))
+    send_telegram(RUN_MESSAGE)
+
 
     listings = fetch_listings()
     print("Fetched listings:", len(listings))
@@ -133,7 +142,10 @@ def main() -> None:
     print("Filtered SWE listings:", len(swe_listings))
 
     current_ids = set(str(role.get("id")) for role in swe_listings if role.get("id"))
+    
     print("Current SWE ids:", len(current_ids))
+    current_ids.add("TEST_FAKE_ID_123")
+
 
     # First run: baseline only
     if not seen_ids:
