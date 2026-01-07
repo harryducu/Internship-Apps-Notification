@@ -1,11 +1,12 @@
 import json
-import requests
 import os
 from pathlib import Path
 
+import requests
 
-
-RAW_URL = "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/refs/heads/dev/README.md"
+# This repo's README is NOT a pipe table anymore.
+# We parse the "## Software Engineering Internship Roles" section.
+RAW_URL = "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/README.md"
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -18,7 +19,7 @@ STATE_FILE = Path("seen_swe_internships.json")
 
 def send_telegram(message: str) -> None:
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    params = {"chat_id": CHAT_ID, "text": message}
+    params = {"chat_id": CHAT_ID, "text": message, "disable_web_page_preview": True}
     r = requests.get(url, params=params, timeout=20)
     r.raise_for_status()
 
@@ -29,71 +30,51 @@ def fetch_readme_text() -> str:
     return r.text
 
 
-def is_swe_role(role: str) -> bool:
-    r = role.lower()
+def extract_swe_section_lines(readme_text: str) -> list[str]:
+    """
+    Extract listing lines from:
+      ## Software Engineering Internship Roles
+    until the next ## header.
 
-    include_keywords = [
-        "software", "swe", "software engineer",
-        "backend", "front end", "frontend", "full stack", "full-stack",
-        "mobile", "ios", "android", "web developer", "developer",
-        "security", "cyber"
-    ]
+    The lines in this section are markdown-ish, often like:
+      [Company](link) | Role | Location | ...
+    or sometimes continuation lines starting with "↳".
+    """
+    lines = readme_text.splitlines()
 
-    exclude_keywords = [
-        "data", "analytics", "business", "product",
-        "pm", "program manager", "design", "ux", "ui",
-        "marketing", "sales", "finance", "accounting", "hr",
-        "devops", "site reliability", "sre", "qa", "test"
-    ]
+    start = None
+    for i, line in enumerate(lines):
+        if line.strip().startswith("## Software Engineering Internship Roles"):
+            start = i + 1
+            break
 
-    if any(k in r for k in exclude_keywords):
-        return False
+    if start is None:
+        return []
 
-    return any(k in r for k in include_keywords)
+    end = len(lines)
+    for j in range(start, len(lines)):
+        s = lines[j].strip()
+        if s.startswith("## "):
+            end = j
+            break
 
+    section = lines[start:end]
 
-def extract_listing_rows(readme_text: str) -> list[str]:
-    rows = []
-    for line in readme_text.splitlines():
-        line = line.strip()
-
-        if not (line.startswith("|") and line.endswith("|")):
+    rows: list[str] = []
+    for line in section:
+        s = line.strip()
+        if not s:
             continue
 
-        stripped = line.replace("|", "").replace("-", "").replace(" ", "")
-        if stripped == "":
+        # Skip the section header row if present
+        if s.lower().startswith("company role location"):
             continue
 
-        lower = line.lower()
-        if "company" in lower and "role" in lower:
-            continue
-
-        rows.append(line)
+        # Most real listings start with a markdown link or a continuation arrow
+        if s.startswith("[") or s.startswith("↳"):
+            rows.append(s)
 
     return rows
-
-
-def row_to_columns(row: str) -> list[str]:
-    return [p.strip() for p in row.strip("|").split("|")]
-
-
-def format_row_message(row: str) -> str:
-    parts = row_to_columns(row)
-
-    company = parts[0] if len(parts) > 0 else "Unknown"
-    role = parts[1] if len(parts) > 1 else "Unknown"
-    location = parts[2] if len(parts) > 2 else "Unknown"
-    link = parts[3] if len(parts) > 3 else ""
-
-    msg = (
-        "🚨 New SWE Internship\n"
-        f"Company: {company}\n"
-        f"Role: {role}\n"
-        f"Location: {location}\n"
-    )
-    if link:
-        msg += f"Link: {link}"
-    return msg
 
 
 def load_seen_ids() -> set[str]:
@@ -101,57 +82,52 @@ def load_seen_ids() -> set[str]:
         try:
             data = json.loads(STATE_FILE.read_text())
             ids = data.get("seen_ids", [])
-            return set(ids) if ids else set()
+            return set(ids) if isinstance(ids, list) else set()
         except Exception:
             return set()
     return set()
-
 
 
 def save_seen_ids(seen_ids: set[str]) -> None:
     STATE_FILE.write_text(json.dumps({"seen_ids": sorted(seen_ids)}, indent=2))
 
 
-def main():
+def format_row_message(line: str) -> str:
+    # Keep it simple: send the raw line (it usually includes company + role + location)
+    # Telegram will show it nicely; disable_web_page_preview is enabled.
+    return f"🚨 New SWE Internship\n{line}"
+
+
+def main() -> None:
     seen_ids = load_seen_ids()
-    print("Loaded seen_ids:", len(seen_ids)) 
+    print("Loaded seen_ids:", len(seen_ids))
 
     readme = fetch_readme_text()
-    rows = extract_listing_rows(readme)
+    swe_lines = extract_swe_section_lines(readme)
 
-    swe_rows = []
-    for row in rows:
-        cols = row_to_columns(row)
-        if len(cols) < 2:
-            continue
-        if is_swe_role(cols[1]):
-            swe_rows.append(row)
+    # Normalize whitespace so minor spacing changes don't cause false positives
+    current_ids = set(" ".join(line.split()) for line in swe_lines)
 
-    current_ids = set(" ".join(r.split()) for r in swe_rows)
-    print("Current SWE ids:", len(current_ids))
-    print("Total table rows:", len(rows))
-    print("SWE rows:", len(swe_rows))
+    print("SWE section lines:", len(swe_lines))
     print("Current SWE ids:", len(current_ids))
 
-
-
+    # First run: save baseline only
     if not seen_ids:
-        send_telegram("✅ Test: Telegram is working. Baseline will now be saved.")
         save_seen_ids(current_ids)
         print("Baseline saved.")
         return
-    
+
     new_ids = current_ids - seen_ids
-    
-
-
 
     if new_ids:
         send_telegram(f"🚨 {len(new_ids)} new SWE internship listing(s) added!")
-        for row in sorted(new_ids)[:5]:
-            send_telegram(format_row_message(row))
+        for line in list(sorted(new_ids))[:5]:
+            send_telegram(format_row_message(line))
+    else:
+        print("No new listings.")
 
-        save_seen_ids(current_ids)
+    # Always update state to latest
+    save_seen_ids(current_ids)
 
 
 if __name__ == "__main__":
