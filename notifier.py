@@ -129,6 +129,10 @@ def main():
 
     current_ids = set(" ".join(r.split()) for r in swe_rows)
     print("Current SWE ids:", len(current_ids))
+    print("Total table rows:", len(rows))
+    print("SWE rows:", len(swe_rows))
+    print("Current SWE ids:", len(current_ids))
+
 
 
     if not seen_ids:
