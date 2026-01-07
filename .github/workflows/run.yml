@@ -31,6 +31,11 @@ jobs:
           key: swe-state-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
             swe-state-${{ github.ref_name }}-
+      - name: Show restored state contents
+        run: |
+          echo "---- seen_swe_internships.json (restored) ----"
+          cat seen_swe_internships.json || true
+
 
       # 🐍 Install deps
       - name: Install dependencies
