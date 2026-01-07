@@ -125,10 +125,11 @@ def main():
     current_ids = set(" ".join(r.split()) for r in swe_rows)
 
     if not seen_ids:
+        send_telegram("✅ Test: Telegram is working. Baseline will now be saved.")
         save_seen_ids(current_ids)
         print("Baseline saved.")
         return
-
+    
     new_ids = current_ids - seen_ids
     
 
