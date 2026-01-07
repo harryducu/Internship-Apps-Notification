@@ -131,6 +131,8 @@ def main():
 
     new_ids = current_ids - seen_ids
     new_ids.add("| Test Company | Software Engineer Intern | Remote | https://example.com |")
+    send_telegram("✅ Test: notifier can send Telegram messages.")
+
 
 
     if new_ids:
