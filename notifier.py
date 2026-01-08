@@ -76,9 +76,8 @@ def role_category(role: dict[str, Any]) -> str:
 
 def is_swe(role: dict[str, Any]) -> bool:
     cat = role_category(role)
-    if not cat:
-        return False
-    return "software engineering" in cat or cat == "swe" or cat == "software"
+    return cat == "software engineering" or cat.startswith("software engineering")
+
 
 
 def fmt_role(role: dict[str, Any]) -> str:
