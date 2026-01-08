@@ -133,7 +133,7 @@ def main() -> None:
 
     sample = swe_listings[:10]
     for r in sample:
-        print("Microsoft:", Software Engineer Intern(r), "|", r.get("company_name"), "|", r.get("title"))
+        print("Microsoft:", role_category(r), "|", r.get("company_name"), "|", r.get("title"))
 
 
     current_ids = set(str(role.get("id")) for role in swe_listings if role.get("id"))
