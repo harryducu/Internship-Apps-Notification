@@ -125,6 +125,17 @@ def main() -> None:
             continue
         swe_listings.append(role)
 
+    cats = {}
+    for r in swe_listings:
+        c = role_category(r) or "MISSING"
+        cats[c] = cats.get(c, 0) + 1
+    print("Category breakdown (filtered):", cats)
+
+    sample = swe_listings[:10]
+    for r in sample:
+        print("Microsoft:", Software Engineer Intern(r), "|", r.get("company_name"), "|", r.get("title"))
+
+
     current_ids = set(str(role.get("id")) for role in swe_listings if role.get("id"))
 
     if not seen_ids:
