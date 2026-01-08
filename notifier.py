@@ -5,12 +5,11 @@ from typing import Any
 
 import requests
 
-LISTINGS_URL = (
-    "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/.github/scripts/listings.json"
-)
+LISTINGS_URL = "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/.github/scripts/listings.json"
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 if not BOT_TOKEN or not CHAT_ID:
     raise RuntimeError("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID")
@@ -20,7 +19,7 @@ STATE_FILE = Path("seen_swe_internships.json")
 RUN_MESSAGE = (
     "🤖 SWE Internship Notifier is running\n\n"
     "A cloud-run bot that monitors GitHub internship listings, "
-    "filters for new software engineering roles, and sends real-time notifications "
+    "filters for new software engineering roles, and sends notifications "
     "when opportunities are added.\n\n"
     "Built by: Harry Ducu"
 )
@@ -38,56 +37,48 @@ def send_telegram(message: str) -> None:
 
 
 def fetch_listings() -> list[dict[str, Any]]:
-    r = requests.get(LISTINGS_URL, headers={"User-Agent": "internship-notifier/1.0"}, timeout=30)
+    headers = {"User-Agent": "internship-notifier/1.0"}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    r = requests.get(LISTINGS_URL, headers=headers, timeout=30)
     r.raise_for_status()
     data = r.json()
     if not isinstance(data, list):
-        raise RuntimeError("Unexpected listings.json format (expected a list)")
+        raise RuntimeError("Unexpected listings.json format")
     return data
 
 
-def is_swe_role(title: str) -> bool:
-    t = (title or "").lower()
-
-    include = [
-        "software", "software engineer", "swe",
-        "backend", "back end", "frontend", "front end",
-        "full stack", "full-stack",
-        "mobile", "ios", "android",
-        "security", "cyber",
-        "developer", "engineer",
-    ]
-
-    exclude = [
-        "data analyst", "data analytics", "business", "product",
-        "program manager", "pm",
-        "designer", "design", "ux", "ui",
-        "marketing", "sales", "finance", "accounting", "hr",
-        "qa", "test engineer", "quality assurance",
-        "sre", "site reliability", "devops",
-    ]
-
-    # If it clearly matches excluded categories, drop it.
-    if any(k in t for k in exclude):
-        return False
-
-    # Otherwise require at least one include keyword.
-    return any(k in t for k in include)
+def load_state() -> dict[str, Any]:
+    if not STATE_FILE.exists():
+        return {"seen_ids": []}
+    try:
+        data = json.loads(STATE_FILE.read_text())
+        if not isinstance(data, dict):
+            return {"seen_ids": []}
+        if not isinstance(data.get("seen_ids"), list):
+            return {"seen_ids": []}
+        return data
+    except Exception:
+        return {"seen_ids": []}
 
 
-def load_seen_ids() -> set[str]:
-    if STATE_FILE.exists():
-        try:
-            data = json.loads(STATE_FILE.read_text())
-            ids = data.get("seen_ids", [])
-            return set(ids) if isinstance(ids, list) else set()
-        except Exception:
-            return set()
-    return set()
-
-
-def save_seen_ids(seen_ids: set[str]) -> None:
+def save_state(seen_ids: set[str]) -> None:
     STATE_FILE.write_text(json.dumps({"seen_ids": sorted(seen_ids)}, indent=2))
+
+
+def role_category(role: dict[str, Any]) -> str:
+    for key in ("category", "role_category", "roleCategory", "type", "role_type", "discipline", "track"):
+        val = role.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip().lower()
+    return ""
+
+
+def is_swe(role: dict[str, Any]) -> bool:
+    cat = role_category(role)
+    if not cat:
+        return False
+    return "software engineering" in cat or cat == "swe" or cat == "software"
 
 
 def fmt_role(role: dict[str, Any]) -> str:
@@ -115,59 +106,45 @@ def fmt_role(role: dict[str, Any]) -> str:
 
 
 def main() -> None:
-    seen_ids = load_seen_ids()
-    print("Loaded seen_ids:", len(seen_ids))
     send_telegram(RUN_MESSAGE)
 
+    state = load_state()
+    seen_ids = set(str(x) for x in state.get("seen_ids", []) if x)
 
     listings = fetch_listings()
-    print("Fetched listings:", len(listings))
 
-    swe_listings: list[dict[str, Any]] = []
+    swe_listings = []
     for role in listings:
         if not isinstance(role, dict):
             continue
-
         if not role.get("active", False):
             continue
         if not role.get("is_visible", False):
             continue
-
-        title = str(role.get("title", ""))
-        if not is_swe_role(title):
+        if not is_swe(role):
             continue
-
         swe_listings.append(role)
 
-    print("Filtered SWE listings:", len(swe_listings))
-
     current_ids = set(str(role.get("id")) for role in swe_listings if role.get("id"))
-    
-    print("Current SWE ids:", len(current_ids))
 
-
-    # First run: baseline only
     if not seen_ids:
-        save_seen_ids(current_ids)
-        print("Baseline saved.")
+        save_state(current_ids)
+        send_telegram("✅ Baseline created for SWE category.")
         return
 
     new_ids = current_ids - seen_ids
 
     if new_ids:
         send_telegram(f"🚨 {len(new_ids)} new SWE internship listing(s) added!")
-        # Send up to 5 listings (sorted for stable order)
         id_to_role = {str(r.get("id")): r for r in swe_listings if r.get("id")}
-        for rid in sorted(new_ids)[:5]:
+        for rid in sorted(new_ids)[:10]:
             role = id_to_role.get(rid)
             if role:
                 send_telegram(fmt_role(role))
             else:
                 send_telegram(f"🚨 New SWE Internship (id: {rid})")
-    else:
-        print("No new listings.")
 
-    save_seen_ids(current_ids)
+    save_state(current_ids)
 
 
 if __name__ == "__main__":
