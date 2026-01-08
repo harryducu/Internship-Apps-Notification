@@ -20,7 +20,7 @@ jobs:
           python-version: "3.12"
 
       - name: Restore state
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: seen_swe_internships.json
           key: swe-state-v2-${{ github.ref_name }}
@@ -35,3 +35,10 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Save state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: seen_swe_internships.json
+          key: swe-state-v2-${{ github.ref_name }}
