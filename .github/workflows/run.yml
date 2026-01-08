@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: "*/30 * * * *"
   workflow_dispatch:
-  
+
 permissions:
   contents: read
   actions: write
@@ -24,10 +24,12 @@ jobs:
           python-version: "3.12"
 
       - name: Restore state
+        id: cache-restore
         uses: actions/cache/restore@v4
         with:
           path: seen_swe_internships.json
-          key: swe-state-v2
+          restore-keys: |
+            swe-state-v2-
 
       - name: Install dependencies
         run: |
@@ -45,9 +47,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: seen_swe_internships.json
-          key: swe-state-v2
-
-      - name: Cache debug info
-        if: always()
-        run: |
-          echo "If cache save failed, open the 'Save state' step details for the exact error."
+          key: swe-state-v2-${{ github.run_id }}
