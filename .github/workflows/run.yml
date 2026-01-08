@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: swe-notifier-${{ github.ref_name }}
+  group: swe-notifier
   cancel-in-progress: true
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: seen_swe_internships.json
-          key: swe-state-v2-${{ github.ref_name }}
+          key: swe-state-v2
 
       - name: Install dependencies
         run: |
@@ -41,4 +41,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: seen_swe_internships.json
-          key: swe-state-v2-${{ github.ref_name }}
+          key: swe-state-v2
