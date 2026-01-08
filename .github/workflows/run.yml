@@ -46,3 +46,8 @@ jobs:
         with:
           path: seen_swe_internships.json
           key: swe-state-v2
+
+      - name: Cache debug info
+        if: always()
+        run: |
+          echo "If cache save failed, open the 'Save state' step details for the exact error."
