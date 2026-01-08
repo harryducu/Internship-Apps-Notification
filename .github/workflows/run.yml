@@ -24,10 +24,10 @@ jobs:
           python-version: "3.12"
 
       - name: Restore state
-        id: cache-restore
         uses: actions/cache/restore@v4
         with:
           path: seen_swe_internships.json
+          key: swe-state-v2-${{ github.ref_name }}-restore
           restore-keys: |
             swe-state-v2-
 
